@@ -96,6 +96,9 @@ describe('pi-ai login flows', () => {
     // through its own prompt rather than leaving it to the settings form.
     expect(offered.find(entry => entry.key === recordKeyFor('deepseek'))?.methods.map(one => one.id))
       .toEqual(['api-key'])
+    // Google offers Sign in with Google (OAuth) alongside API key.
+    expect(offered.find(entry => entry.key === recordKeyFor('google'))?.methods.map(one => one.id))
+      .toEqual(['oauth', 'api-key'])
   })
 
   it('runs the pi-ai auth type the chosen method names', async () => {

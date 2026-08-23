@@ -14,6 +14,7 @@ import type { AuthorizationMethod, AuthorizationPrompt, AuthorizationSession } f
 import { isCredentialKeySegment } from '@deepseek-ai/dsh-credentials'
 import { catalogProvider, catalogProviderIds } from './catalog.ts'
 import { recordKeyFor } from './auth.ts'
+import { runGoogleOAuth } from './google-oauth.ts'
 import type { PiAiAuthInjection } from './adapter.ts'
 
 /**
@@ -28,6 +29,9 @@ import type { PiAiAuthInjection } from './adapter.ts'
  */
 function loginMethods(provider: Provider | undefined): AuthorizationMethod[] {
   const methods: AuthorizationMethod[] = []
+  if (provider?.id === 'google' || provider?.id === 'google-vertex') {
+    methods.push({ id: 'oauth', label: 'Sign in with Google' })
+  }
   const oauth = provider?.auth.oauth
   if (oauth !== undefined) methods.push({ id: 'oauth', label: oauth.loginLabel ?? oauth.name })
   const apiKey = provider?.auth.apiKey
@@ -140,6 +144,10 @@ export function registerPiAiFlows(ctx: Context, auth: PiAiAuthInjection): void {
       label: provider.name,
       methods: [first, ...rest],
       async run(session) {
+        if ((providerId === 'google' || providerId === 'google-vertex') && session.method === 'oauth') {
+          await runGoogleOAuth(ctx, session)
+          return
+        }
         // A collection of its own, holding only the provider being signed
         // into: login is not serving requests, and the credential it produces
         // lands in the shared store either way.
