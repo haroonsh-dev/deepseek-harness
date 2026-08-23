@@ -12,7 +12,6 @@ const DEFAULT_GOOGLE_CLIENT_ID =
   '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com'
 const DEFAULT_GOOGLE_CLIENT_SECRET = 'd-FL95Q19q7MQmFpd7hHD0Ty'
 const DEFAULT_SCOPES = [
-  'https://www.googleapis.com/auth/generative-language',
   'https://www.googleapis.com/auth/cloud-platform',
   'openid',
   'email',

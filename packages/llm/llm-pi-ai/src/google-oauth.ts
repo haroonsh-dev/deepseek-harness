@@ -23,7 +23,6 @@ const DEFAULT_GOOGLE_CLIENT_SECRET = 'd-FL95Q19q7MQmFpd7hHD0Ty'
 
 /** Default OAuth scopes for Gemini and Google Cloud AI. */
 const DEFAULT_SCOPES = [
-  'https://www.googleapis.com/auth/generative-language',
   'https://www.googleapis.com/auth/cloud-platform',
   'openid',
   'email',
