@@ -162,13 +162,17 @@ export function registerGoogleAuthRoutes(ctx: Context): void {
 
         const credentials = ctx.get('credentials')
         if (credentials) {
+          const expires = Date.now() + (tokenData.expires_in ?? 3600) * 1000
           const grantPayload = {
             type: 'oauth',
             provider: 'google',
+            access: tokenData.access_token,
+            refresh: tokenData.refresh_token ?? '',
+            expires,
             tokens: {
               accessToken: tokenData.access_token,
               refreshToken: tokenData.refresh_token,
-              expiresAt: Date.now() + (tokenData.expires_in ?? 3600) * 1000,
+              expiresAt: expires,
             },
           }
           await credentials.modifyRecord('llm-pi-ai/google' as never, async () => ({

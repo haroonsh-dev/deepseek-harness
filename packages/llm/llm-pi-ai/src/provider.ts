@@ -20,7 +20,7 @@
  */
 
 import { createProvider } from '@earendil-works/pi-ai'
-import type { Api, ApiKeyAuth, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai'
+import type { Api, ApiKeyAuth, Model, OAuthAuth, OAuthCredential, Provider, ProviderStreams } from '@earendil-works/pi-ai'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
@@ -128,10 +128,64 @@ export interface ProviderSpec {
  * @param catalog - the installed catalog provider, when pi-ai ships one.
  * @returns the auth to construct this route's provider with.
  */
+/** Google OAuth authentication provider for Google and Google Vertex routes. */
+function googleOAuthAuth(name: string): OAuthAuth {
+  return {
+    name: `${name} (Google Account)`,
+    loginLabel: 'Sign in with Google',
+    login: async () => {
+      throw new Error('Interactive login is handled by harness authorization')
+    },
+    refresh: async (credential: OAuthCredential) => {
+      const clientId =
+        process.env.GOOGLE_OAUTH_CLIENT_ID
+        ?? '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com'
+      const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? 'd-FL95Q19q7MQmFpd7hHD0Ty'
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: credential.refresh,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(`Google OAuth refresh failed: ${await response.text()}`)
+      }
+      const data = (await response.json()) as { access_token: string; expires_in?: number; refresh_token?: string }
+      return {
+        type: 'oauth',
+        access: data.access_token,
+        refresh: data.refresh_token ?? credential.refresh,
+        expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+      }
+    },
+    toAuth: async (credential: OAuthCredential) => {
+      return {
+        apiKey: credential.access,
+        headers: {
+          Authorization: `Bearer ${credential.access}`,
+        },
+      }
+    },
+  }
+}
+
 function routeAuth(spec: ProviderSpec, catalog: Provider | undefined): Provider['auth'] {
-  if (catalog === undefined) return { apiKey: harnessApiKeyAuth(spec.displayName) }
-  if (catalog.auth.apiKey !== undefined || !spec.namesCredential) return catalog.auth
-  return { ...catalog.auth, apiKey: harnessApiKeyAuth(spec.displayName) }
+  const isGoogle = spec.provider === 'google' || spec.provider === 'google-vertex' || catalog?.id === 'google' || catalog?.id === 'google-vertex'
+  const oauth = isGoogle ? googleOAuthAuth(spec.displayName) : catalog?.auth.oauth
+
+  if (catalog === undefined) {
+    return {
+      apiKey: harnessApiKeyAuth(spec.displayName),
+      ...oauth === undefined ? {} : { oauth },
+    }
+  }
+  const baseAuth = { ...catalog.auth, ...oauth === undefined ? {} : { oauth } }
+  if (baseAuth.apiKey !== undefined || !spec.namesCredential) return baseAuth
+  return { ...baseAuth, apiKey: harnessApiKeyAuth(spec.displayName) }
 }
 
 /**

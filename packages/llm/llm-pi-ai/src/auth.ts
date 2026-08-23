@@ -56,6 +56,20 @@ function toPiCredential(record: CredentialRecord | undefined): Credential | unde
       ...record.env === undefined ? {} : { env: { ...record.env } },
     }
   }
+  const payload = record.payload as Record<string, unknown>
+  if (payload.type === 'oauth' || payload['tokens'] !== undefined) {
+    const tokens = payload['tokens'] as Record<string, unknown> | undefined
+    const access = (payload['access'] ?? tokens?.['accessToken'] ?? '') as string
+    const refresh = (payload['refresh'] ?? tokens?.['refreshToken'] ?? '') as string
+    const expires = (payload['expires'] ?? tokens?.['expiresAt'] ?? (Date.now() + 3600 * 1000)) as number
+    return {
+      type: 'oauth',
+      access,
+      refresh,
+      expires,
+      ...payload,
+    } as Credential
+  }
   return record.payload as Credential
 }
 

@@ -231,6 +231,9 @@ export async function runGoogleOAuth(
     const grantPayload = {
       type: 'oauth',
       provider: 'google',
+      access: tokenData.access_token,
+      refresh: tokenData.refresh_token ?? '',
+      expires: expiresAt,
       tokens: {
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
