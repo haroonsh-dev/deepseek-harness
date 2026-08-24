@@ -108,6 +108,16 @@ export interface HeroShellProps {
   children?: ReactNode
 }
 
+function getGreeting(fallbackHeadline: string): string {
+  if (fallbackHeadline && fallbackHeadline !== 'Into the Unknown' && fallbackHeadline !== '探索未至之境') {
+    return fallbackHeadline
+  }
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'Good morning, Haroon'
+  if (hour >= 12 && hour < 18) return 'Good afternoon, Haroon'
+  return 'Good evening, Haroon'
+}
+
 /**
  * Render the hero chrome (headline only; no glow, no composer, no workspace
  * row — the glow is the owner's {@link HeroGlow}).
@@ -115,6 +125,7 @@ export interface HeroShellProps {
  * @returns the centered hero element tree.
  */
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
+  const headline = getGreeting(t('hero.headline'))
   return (
     <div className={css.root}>
       <div className={css.stack}>
@@ -125,8 +136,11 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
               fallback: <FishLogo size={34} className={css.fish} />,
             })}
           </span>
-          <span className={css.headlineText}>{t('hero.headline')}</span>
+          <span className={css.headlineText}>{headline}</span>
           <span className={css.previewBadge}>{t('hero.preview')}</span>
+        </div>
+        <div style={{ textAlign: 'center', color: 'var(--dsw-alias-label-secondary, #94a3b8)', fontSize: 15, fontWeight: 400, marginTop: -4, marginBottom: 8 }}>
+          How can I help you today?
         </div>
         <div className={css.body}>
           {/* The resident composer (ConversationRoot's root-owned scrollport;
