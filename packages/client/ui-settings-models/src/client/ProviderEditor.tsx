@@ -417,21 +417,39 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                 </div>
               )
               : null}
-            <div className={styles['field']}>
-              <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
-              <input
-                className={styles['input']}
-                type="text"
-                value={stringAt(draft, 'baseURL') ?? ''}
-                placeholder={family === 'deepseek'
-                  ? DEEPSEEK_PUBLIC_BASE_URL
-                  : stringAt(fallback, 'baseURL') ?? t('baseUrlDefault')}
-                aria-label={t('baseUrl')}
-                disabled={disabled}
-                onChange={(event) => {
-                  setField('baseURL', event.target.value === '' ? undefined : event.target.value)
-                }}
-              />
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div className={styles['field']} style={{ flex: 1 }}>
+                <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
+                <input
+                  className={styles['input']}
+                  type="text"
+                  value={stringAt(draft, 'baseURL') ?? ''}
+                  placeholder={family === 'deepseek'
+                    ? DEEPSEEK_PUBLIC_BASE_URL
+                    : stringAt(fallback, 'baseURL') ?? t('baseUrlDefault')}
+                  aria-label={t('baseUrl')}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    setField('baseURL', event.target.value === '' ? undefined : event.target.value)
+                  }}
+                />
+              </div>
+              <div className={styles['field']} style={{ width: 140 }}>
+                <span className={styles['fieldLabel']}>{t('port')}</span>
+                <input
+                  className={styles['input']}
+                  type="text"
+                  placeholder="11434"
+                  aria-label={t('port')}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const trimmed = event.target.value.trim()
+                    if (/^\d+$/.test(trimmed)) {
+                      setField('baseURL', `http://127.0.0.1:${trimmed}/v1`)
+                    }
+                  }}
+                />
+              </div>
             </div>
             {/* The protocol sits beside the endpoint it describes, as it does
                 on the create card. */}

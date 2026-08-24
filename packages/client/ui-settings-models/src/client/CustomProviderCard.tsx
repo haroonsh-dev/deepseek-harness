@@ -187,11 +187,76 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     }
   }
 
+  const [port, setPort] = useState('')
+
+  const PRESETS = [
+    { label: 'Ollama', port: '11434', route: 'ollama', name: 'Ollama', url: 'http://127.0.0.1:11434/v1', model: 'llama3.3' },
+    { label: 'LM Studio', port: '1234', route: 'lm-studio', name: 'LM Studio', url: 'http://127.0.0.1:1234/v1', model: 'local-model' },
+    { label: 'vLLM', port: '8000', route: 'vllm', name: 'vLLM', url: 'http://127.0.0.1:8000/v1', model: 'default' },
+    { label: 'LocalAI', port: '8080', route: 'localai', name: 'LocalAI', url: 'http://127.0.0.1:8080/v1', model: 'gpt-3.5-turbo' },
+  ]
+
+  const applyPreset = (p: typeof PRESETS[number]) => {
+    setRoute(p.route)
+    setDisplayName(p.name)
+    setPort(p.port)
+    setBaseURL(p.url)
+    if (protocols.includes('openai-completions')) setProtocol('openai-completions')
+    if (models.length === 0) {
+      setModels([{ id: p.model, name: p.model }])
+    }
+  }
+
+  const handlePortChange = (val: string) => {
+    setPort(val)
+    const trimmed = val.trim()
+    if (/^\d+$/.test(trimmed)) {
+      setBaseURL(`http://127.0.0.1:${trimmed}/v1`)
+    }
+  }
+
+  const handleBaseURLChange = (val: string) => {
+    setBaseURL(val)
+    try {
+      const parsed = new URL(val)
+      if (parsed.port) setPort(parsed.port)
+    } catch {
+      // not a valid url yet
+    }
+  }
+
   return (
     <div className={styles['editor']}>
       <div className={styles['editorHeader']}>
         <span className={styles['editorTitle']}>{t('customTitle')}</span>
       </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <span className={styles['fieldLabel']} style={{ marginBottom: 6, display: 'block' }}>{t('presets')}</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {PRESETS.map(p => (
+            <button
+              key={p.label}
+              type="button"
+              disabled={profileDisabled}
+              onClick={() => { applyPreset(p) }}
+              style={{
+                background: 'var(--dsh-color-bg-subtle, rgba(255, 255, 255, 0.05))',
+                border: '1px solid var(--dsh-color-border-subtle, rgba(255, 255, 255, 0.15))',
+                borderRadius: 6,
+                padding: '4px 10px',
+                fontSize: 12,
+                color: 'var(--dsh-color-text-primary, #f8fafc)',
+                cursor: 'pointer',
+                fontWeight: 500,
+              }}
+            >
+              + {p.label} ({p.port})
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customRoute')}</span>
         <input
@@ -221,17 +286,31 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           onChange={(event) => { setDisplayName(event.target.value) }}
         />
       </div>
-      <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
-        <input
-          className={styles['input']}
-          type="text"
-          value={baseURL}
-          placeholder="https://gateway.example/v1"
-          aria-label={t('baseUrl')}
-          disabled={profileDisabled}
-          onChange={(event) => { setBaseURL(event.target.value) }}
-        />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div className={styles['field']} style={{ flex: 1 }}>
+          <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
+          <input
+            className={styles['input']}
+            type="text"
+            value={baseURL}
+            placeholder="http://127.0.0.1:11434/v1"
+            aria-label={t('baseUrl')}
+            disabled={profileDisabled}
+            onChange={(event) => { handleBaseURLChange(event.target.value) }}
+          />
+        </div>
+        <div className={styles['field']} style={{ width: 140 }}>
+          <span className={styles['fieldLabel']}>{t('port')}</span>
+          <input
+            className={styles['input']}
+            type="text"
+            value={port}
+            placeholder="11434"
+            aria-label={t('port')}
+            disabled={profileDisabled}
+            onChange={(event) => { handlePortChange(event.target.value) }}
+          />
+        </div>
       </div>
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customApi')}</span>
