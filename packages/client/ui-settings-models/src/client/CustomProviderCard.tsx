@@ -187,6 +187,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     }
   }
 
+  const [routeTouched, setRouteTouched] = useState(false)
   const [port, setPort] = useState('')
 
   const PRESETS = [
@@ -196,14 +197,29 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     { label: 'LocalAI', port: '8080', route: 'localai', name: 'LocalAI', url: 'http://127.0.0.1:8080/v1', model: 'gpt-3.5-turbo' },
   ]
 
+  const POPULAR_MODELS = [
+    'llama3.3', 'qwen2.5-coder', 'mistral', 'deepseek-r1', 'gpt-4o', 'gemini-3.7-flash', 'claude-3-7-sonnet',
+  ]
+
+  const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
   const applyPreset = (p: typeof PRESETS[number]) => {
     setRoute(p.route)
+    setRouteTouched(true)
     setDisplayName(p.name)
     setPort(p.port)
     setBaseURL(p.url)
     if (protocols.includes('openai-completions')) setProtocol('openai-completions')
     if (models.length === 0) {
       setModels([{ id: p.model, name: p.model }])
+    }
+  }
+
+  const handleDisplayNameChange = (val: string) => {
+    setDisplayName(val)
+    if (!routeTouched) {
+      const slug = slugify(val)
+      if (slug.length > 0) setRoute(slug)
     }
   }
 
@@ -222,6 +238,12 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       if (parsed.port) setPort(parsed.port)
     } catch {
       // not a valid url yet
+    }
+  }
+
+  const addQuickModel = (modelId: string) => {
+    if (!models.some(m => m.id === modelId)) {
+      setModels([...models, { id: modelId, name: modelId }])
     }
   }
 
@@ -258,15 +280,31 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       </div>
 
       <div className={styles['field']}>
+        <span className={styles['fieldLabel']}>{t('customDisplayName')}</span>
+        <input
+          className={styles['input']}
+          type="text"
+          value={displayName}
+          placeholder="Ollama Local"
+          aria-label={t('customDisplayName')}
+          disabled={profileDisabled}
+          onChange={(event) => { handleDisplayNameChange(event.target.value) }}
+        />
+      </div>
+
+      <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customRoute')}</span>
         <input
           className={styles['input']}
           type="text"
           value={route}
-          placeholder="acme-gateway"
+          placeholder="ollama-local"
           aria-label={t('customRoute')}
           disabled={profileDisabled}
-          onChange={(event) => { setRoute(event.target.value) }}
+          onChange={(event) => {
+            setRouteTouched(true)
+            setRoute(event.target.value)
+          }}
         />
       </div>
       {/* A rejected id reads as a fault, not as guidance — the same split the
@@ -274,18 +312,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       {routeInvalid || routeTaken
         ? <p className={styles['error']}>{t(routeInvalid ? 'customRouteInvalid' : 'customRouteTaken')}</p>
         : <p className={styles['advancedHint']}>{t('customRouteHint')}</p>}
-      <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('customDisplayName')}</span>
-        <input
-          className={styles['input']}
-          type="text"
-          value={displayName}
-          placeholder={route.length === 0 ? t('customDisplayName') : route}
-          aria-label={t('customDisplayName')}
-          disabled={profileDisabled}
-          onChange={(event) => { setDisplayName(event.target.value) }}
-        />
-      </div>
+
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className={styles['field']} style={{ flex: 1 }}>
           <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
@@ -325,13 +352,13 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         </select>
       </div>
       <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('keyInput')}</span>
+        <span className={styles['fieldLabel']}>{t('keyInput')} (Optional for local servers)</span>
         <input
           className={styles['input']}
           type="password"
           autoComplete="off"
           value={keyDraft}
-          placeholder={t('keyPlaceholder')}
+          placeholder="Leave blank if not required, or enter API key"
           aria-label={t('keyInput')}
           disabled={disabled}
           onChange={(event) => { setKeyDraft(event.target.value) }}
@@ -342,6 +369,33 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         {keyFailure === undefined
           ? null
           : <p className={styles['error']}>{t(keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure)}</p>}
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <span className={styles['fieldLabel']} style={{ marginBottom: 4, display: 'block', fontSize: 12 }}>
+          Quick add popular model:
+        </span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {POPULAR_MODELS.map(m => (
+            <button
+              key={m}
+              type="button"
+              disabled={profileDisabled}
+              onClick={() => { addQuickModel(m) }}
+              style={{
+                background: 'var(--dsh-color-bg-subtle, rgba(255, 255, 255, 0.04))',
+                border: '1px dashed var(--dsh-color-border-subtle, rgba(255, 255, 255, 0.15))',
+                borderRadius: 4,
+                padding: '2px 8px',
+                fontSize: 11,
+                color: 'var(--dsh-color-text-secondary, #cbd5e1)',
+                cursor: 'pointer',
+              }}
+            >
+              + {m}
+            </button>
+          ))}
+        </div>
       </div>
       <ModelListEditor
         models={models}
