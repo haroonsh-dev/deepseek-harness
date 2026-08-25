@@ -109,9 +109,6 @@ export function SecuritySection(_props: SecuritySectionProps) {
       <div className={css.header}>
         <div className={css.titleGroup}>
           <div className={css.title}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
             Security & Guardrails
           </div>
           <div className={css.subtitle}>
@@ -119,17 +116,14 @@ export function SecuritySection(_props: SecuritySectionProps) {
             inspect, and protect prompts, tool calls, and model outputs.
           </div>
         </div>
-        <label className={css.toggleSwitch}>
-          <input
-            type="checkbox"
-            className={css.checkbox}
-            checked={config.enabled}
-            onChange={(e) => { setConfig(prev => ({ ...prev, enabled: e.target.checked })) }}
-          />
-          <span style={{ fontSize: 13, fontWeight: 600, color: config.enabled ? '#4ade80' : 'var(--dsw-alias-label-secondary)' }}>
-            {config.enabled ? 'Active 🟢' : 'Disabled ⚪'}
-          </span>
-        </label>
+        <button
+          type="button"
+          className={config.enabled ? css.primaryBtn : css.secondaryBtn}
+          style={{ padding: '6px 14px', fontSize: 12, height: 32 }}
+          onClick={() => { setConfig(prev => ({ ...prev, enabled: !prev.enabled })) }}
+        >
+          {config.enabled ? 'Enabled' : 'Disabled'}
+        </button>
       </div>
 
       <div className={css.card}>
