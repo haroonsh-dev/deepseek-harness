@@ -76,9 +76,10 @@ export function SecuritySection(_props: SecuritySectionProps) {
       })
       const latency = Date.now() - startTime
       if (res.ok || res.status === 200 || res.status === 204) {
+        setConfig(prev => ({ ...prev, enabled: true }))
         setTestResult({
           ok: true,
-          message: `Connected successfully! Security service latency: ${latency}ms (HTTP ${res.status})`,
+          message: `Connected successfully! Security service is active (${latency}ms latency, HTTP ${res.status})`,
         })
       } else {
         const text = await res.text().catch(() => '')
@@ -173,13 +174,13 @@ export function SecuritySection(_props: SecuritySectionProps) {
         <div className={css.buttonRow}>
           <button
             type="button"
-            className={css.secondaryBtn}
+            className={css.primaryBtn}
             disabled={testing || !config.endpoint}
             onClick={testConnection}
           >
-            {testing ? 'Testing connection…' : '🔍 Test Security Connection'}
+            {testing ? 'Connecting…' : 'Verify & Connect Service'}
           </button>
-          {savedBadge && <span style={{ fontSize: 12, color: '#4ade80' }}>✓ Settings saved</span>}
+          {savedBadge && <span style={{ fontSize: 12, color: '#4ade80' }}>✓ Saved & Active</span>}
         </div>
 
         {testResult && (
