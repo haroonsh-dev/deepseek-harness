@@ -112,17 +112,87 @@ function ModelRetryItem({ node, active, t }: {
   )
 }
 
+/** Parse and present clean, friendly error messages for provider errors (e.g. balance, quota, thinking level, auth). */
+function formatTurnErrorMessage(raw: string): string {
+  if (!raw) return 'An unknown error occurred during execution.'
+
+  // Unpack nested JSON strings if present (e.g., {"error":{"message":"..."}})
+  let text = raw.trim()
+  for (let i = 0; i < 3; i++) {
+    if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+      try {
+        const parsed = JSON.parse(text)
+        if (typeof parsed?.error?.message === 'string') {
+          text = parsed.error.message.trim()
+        } else if (typeof parsed?.message === 'string') {
+          text = parsed.message.trim()
+        } else if (typeof parsed?.error === 'string') {
+          text = parsed.error.trim()
+        } else {
+          break
+        }
+      } catch {
+        break
+      }
+    } else {
+      break
+    }
+  }
+
+  const lower = text.toLowerCase()
+
+  // Insufficient Balance / Quota / Credits
+  if (
+    lower.includes('insufficient_quota')
+    || lower.includes('insufficient_balance')
+    || lower.includes('insufficient balance')
+    || lower.includes('quota')
+    || lower.includes('resource_exhausted')
+    || lower.includes('out of credits')
+    || lower.includes('credits exhausted')
+    || lower.includes('billing')
+    || lower.includes('credit balance is too low')
+  ) {
+    return 'Insufficient balance or quota exceeded. Please check your model provider balance and billing credits.'
+  }
+
+  // Thinking level / Reasoning effort not supported
+  if (lower.includes('thinking level') && lower.includes('not supported')) {
+    return 'The selected thinking level is not supported for this model. Please select a different reasoning effort (e.g. Low, Medium, or High) in the model picker.'
+  }
+
+  // Authentication / API Key issues
+  if (
+    lower.includes('invalid_api_key')
+    || lower.includes('api_key_invalid')
+    || lower.includes('unauthenticated')
+    || lower.includes('permission_denied')
+    || lower.includes('incorrect api key')
+    || lower.includes('invalid api key')
+  ) {
+    return 'Invalid or missing API key. Please check your API key in Settings → Models.'
+  }
+
+  // Rate limits
+  if (lower.includes('rate_limit') || lower.includes('too many requests') || lower.includes('429')) {
+    return 'Rate limit exceeded. Please wait a moment before sending your next message.'
+  }
+
+  return text
+}
+
 /** Persistent, turn-positioned feedback for a terminal failure. */
 function TurnErrorItem({ node, t }: {
   node: TurnErrorNode
   t: ChatViewSlotProps['t']
 }) {
+  const displayMessage = formatTurnErrorMessage(node.message)
   return (
     <div className={css.turnErrorRow} role="status">
       <StateDot state="error" className={css.turnErrorDot} />
       <div className={css.turnErrorCopy}>
         <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
-        <span className={css.turnErrorMessage}>{node.message}</span>
+        <span className={css.turnErrorMessage}>{displayMessage}</span>
       </div>
       {node.code !== undefined && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
