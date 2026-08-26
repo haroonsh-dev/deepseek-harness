@@ -83,7 +83,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [baseURL, setBaseURL] = useState('')
   const [protocol, setProtocol] = useState(protocols[0] ?? '')
   const [keyDraft, setKeyDraft] = useState('')
-  const [models, setModels] = useState<readonly ModelDraft[]>([])
+  const [models, setModels] = useState<readonly ModelDraft[]>([{ id: '' }])
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
   /**
@@ -190,30 +190,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [routeTouched, setRouteTouched] = useState(false)
   const [port, setPort] = useState('')
 
-  const PRESETS = [
-    { label: 'Ollama', port: '11434', route: 'ollama', name: 'Ollama', url: 'http://127.0.0.1:11434/v1', model: 'llama3.3' },
-    { label: 'LM Studio', port: '1234', route: 'lm-studio', name: 'LM Studio', url: 'http://127.0.0.1:1234/v1', model: 'local-model' },
-    { label: 'vLLM', port: '8000', route: 'vllm', name: 'vLLM', url: 'http://127.0.0.1:8000/v1', model: 'default' },
-    { label: 'LocalAI', port: '8080', route: 'localai', name: 'LocalAI', url: 'http://127.0.0.1:8080/v1', model: 'gpt-3.5-turbo' },
-  ]
-
-  const POPULAR_MODELS = [
-    'llama3.3', 'qwen2.5-coder', 'mistral', 'deepseek-r1', 'gpt-4o', 'gemini-3.7-flash', 'claude-3-7-sonnet',
-  ]
-
   const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-
-  const applyPreset = (p: typeof PRESETS[number]) => {
-    setRoute(p.route)
-    setRouteTouched(true)
-    setDisplayName(p.name)
-    setPort(p.port)
-    setBaseURL(p.url)
-    if (protocols.includes('openai-completions')) setProtocol('openai-completions')
-    if (models.length === 0) {
-      setModels([{ id: p.model, name: p.model }])
-    }
-  }
 
   const handleDisplayNameChange = (val: string) => {
     setDisplayName(val)
@@ -241,42 +218,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     }
   }
 
-  const addQuickModel = (modelId: string) => {
-    if (!models.some(m => m.id === modelId)) {
-      setModels([...models, { id: modelId, name: modelId }])
-    }
-  }
-
   return (
     <div className={styles['editor']}>
       <div className={styles['editorHeader']}>
         <span className={styles['editorTitle']}>{t('customTitle')}</span>
-      </div>
-
-      <div style={{ marginBottom: 14 }}>
-        <span className={styles['fieldLabel']} style={{ marginBottom: 6, display: 'block' }}>{t('presets')}</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {PRESETS.map(p => (
-            <button
-              key={p.label}
-              type="button"
-              disabled={profileDisabled}
-              onClick={() => { applyPreset(p) }}
-              style={{
-                background: 'var(--dsh-color-bg-subtle, rgba(255, 255, 255, 0.05))',
-                border: '1px solid var(--dsh-color-border-subtle, rgba(255, 255, 255, 0.15))',
-                borderRadius: 6,
-                padding: '4px 10px',
-                fontSize: 12,
-                color: 'var(--dsh-color-text-primary, #f8fafc)',
-                cursor: 'pointer',
-                fontWeight: 500,
-              }}
-            >
-              + {p.label} ({p.port})
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className={styles['field']}>
@@ -285,7 +230,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={displayName}
-          placeholder="Ollama Local"
+          placeholder="My Custom Provider"
           aria-label={t('customDisplayName')}
           disabled={profileDisabled}
           onChange={(event) => { handleDisplayNameChange(event.target.value) }}
@@ -298,7 +243,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={route}
-          placeholder="ollama-local"
+          placeholder="custom-provider"
           aria-label={t('customRoute')}
           disabled={profileDisabled}
           onChange={(event) => {
@@ -320,7 +265,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
             className={styles['input']}
             type="text"
             value={baseURL}
-            placeholder="http://127.0.0.1:11434/v1"
+            placeholder="http://127.0.0.1:8000/v1"
             aria-label={t('baseUrl')}
             disabled={profileDisabled}
             onChange={(event) => { handleBaseURLChange(event.target.value) }}
@@ -332,7 +277,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
             className={styles['input']}
             type="text"
             value={port}
-            placeholder="11434"
+            placeholder="8000"
             aria-label={t('port')}
             disabled={profileDisabled}
             onChange={(event) => { handlePortChange(event.target.value) }}
@@ -371,32 +316,6 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           : <p className={styles['error']}>{t(keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure)}</p>}
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <span className={styles['fieldLabel']} style={{ marginBottom: 4, display: 'block', fontSize: 12 }}>
-          Quick add popular model:
-        </span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {POPULAR_MODELS.map(m => (
-            <button
-              key={m}
-              type="button"
-              disabled={profileDisabled}
-              onClick={() => { addQuickModel(m) }}
-              style={{
-                background: 'var(--dsh-color-bg-subtle, rgba(255, 255, 255, 0.04))',
-                border: '1px dashed var(--dsh-color-border-subtle, rgba(255, 255, 255, 0.15))',
-                borderRadius: 4,
-                padding: '2px 8px',
-                fontSize: 11,
-                color: 'var(--dsh-color-text-secondary, #cbd5e1)',
-                cursor: 'pointer',
-              }}
-            >
-              + {m}
-            </button>
-          ))}
-        </div>
-      </div>
       <ModelListEditor
         models={models}
         onChange={setModels}
