@@ -1,24 +1,12 @@
 /**
  * The card that declares a provider pi-ai does not ship — an OpenAI-compatible
- * gateway, a self-hosted server, or a provider newer than the installed
- * catalog.
+ * gateway, a self-hosted server (Ollama, LM Studio, vLLM), or a custom provider.
  *
- * This is a create, not an edit, which is why it is its own card rather than
- * the provider editor with extra fields: the route id is being *chosen* here,
- * and the settings address does not exist until it is. One `settings.mutate`
- * sets the whole profile at `providers.<route>`; the key travels separately
- * through `credentials.set` under the reference the profile records, exactly as
- * an existing provider's key does.
- *
- * The three fields a hand-declared route cannot default — endpoint, protocol,
- * and at least one model — are required here rather than at load, so the
- * failure names the field while the user is still looking at it.
- *
- * There is deliberately no reasoning-effort control, here or on the editor
- * card: effort is a per-MODEL capability, and the models under one provider
- * disagree about it, so a provider-scoped control can only be set to a value
- * some of them reject. The composer's model picker offers each model its own
- * levels instead.
+ * It provides a clean, unified 4-field creation experience:
+ * - Provider Name
+ * - Base URL
+ * - Model Name
+ * - API Key (optional)
  */
 
 import { useState } from 'react'
@@ -26,25 +14,12 @@ import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
-import { validateDeepSeekModels } from './DeepSeekModelsEditor.tsx'
-import { ModelListEditor } from './ModelListEditor.tsx'
-import type { ModelDraft } from './ModelListEditor.tsx'
 import { deriveKeyRef, messageOf } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** The settings namespace a hand-declared provider is written into. */
 const NS = 'llm-pi-ai'
-
-/**
- * A route id usable as a settings key AND as the stem of a credential name.
- * The leading letter is the second half of that: `deriveKeyRef` uppercases the
- * id and replaces every non-alphanumeric run with `_`, and a credential
- * reference is a POSIX shell identifier, which cannot start with a digit. A
- * digit-leading id passes every check this card makes and then fails at the
- * credential seam with a raw regular expression the user cannot act on.
- */
-const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
 /** Props of {@link CustomProviderCard}. */
 export interface CustomProviderCardProps {
@@ -69,100 +44,79 @@ export interface CustomProviderCardProps {
 }
 
 /**
- * Render the custom-provider creation card.
+ * Render the simplified custom-provider creation card.
  * @param props - existing routes, protocol choices, wire faces, and copy.
  * @returns the creation card.
  */
 export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const { taken, protocols, api, t } = props
-  // Captured at mount, like the editor's: the write must be judged against the
-  // section this card was drafted over, not whatever it grew into meanwhile.
   const [openedAt] = useState(() => props.revision)
-  const [route, setRoute] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [baseURL, setBaseURL] = useState('')
-  const [protocol, setProtocol] = useState(protocols[0] ?? '')
+  const [modelName, setModelName] = useState('')
   const [keyDraft, setKeyDraft] = useState('')
-  const [models, setModels] = useState<readonly ModelDraft[]>([{ id: '' }])
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
-  /**
-   * The profile write landed. Only the key write can still be outstanding, so
-   * the fields that describe the provider are settled and the retry path is
-   * the credential alone.
-   */
   const [committed, setCommitted] = useState(false)
+
   const disabled = props.readOnly || busy
-  /** Everything but the key stops being editable once the provider exists. */
   const profileDisabled = disabled || committed
 
-  const routeInvalid = route.length > 0 && !ROUTE_PATTERN.test(route)
-  const routeTaken = taken.includes(route)
-  // Rows are checked by the same per-row validator the editor cards use, so a
-  // bad row is named by its position here too. Capacities have route-level
-  // fallbacks; what a route cannot default is at least one model.
-  const modelFailure = validateDeepSeekModels(models)
-  const keyFailure = apiKeyFailure(keyDraft)
-  // The typed key with paste whitespace removed. A blank field yields an empty
-  // string, which the create path reads as "no key supplied" — a route may
-  // legitimately authenticate through the provider's own ambient discovery.
-  const keyValue = keyDraft.trim()
-  const ready = route.length > 0 && !routeInvalid && !routeTaken
-    && baseURL.length > 0 && models.length > 0 && modelFailure === undefined
-    && keyFailure === undefined
-  // The one blocked gate worth a line under the form. A satisfied card says
-  // nothing at all rather than printing an empty paragraph.
-  const hint = failure !== undefined || ready
-    // The key field prints its own failure directly beneath itself, so a card
-    // blocked only by the key stays silent here rather than answering with the
-    // next unmet gate — which is satisfied, and reads as a second, false fault.
-    || keyFailure !== undefined
-    // Same for the route id, and it must be tested rather than assumed: the
-    // fallback arm below reads "no models yet", so an unmet route gate would
-    // fall through to it and contradict the filled-in list right above.
-    || route.length === 0 || routeInvalid || routeTaken
-    ? undefined
-    : baseURL.length === 0
-      ? t('customNeedsBaseUrl')
-      : modelFailure !== undefined
-        ? `${t('model')} ${String(modelFailure.index + 1)}: ${t(modelFailure.key)}`
-        : t('customNeedsModels')
+  const slugify = (text: string): string => {
+    let slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    if (!slug || !/^[a-z]/.test(slug)) slug = `provider-${slug || 'custom'}`
+    return slug
+  }
 
-  /** Perform the create, returning a failure message or undefined. */
+  const deriveUniqueRoute = (name: string): string => {
+    const base = slugify(name)
+    let candidate = base
+    let counter = 1
+    while (taken.includes(candidate)) {
+      candidate = `${base}-${counter++}`
+    }
+    return candidate
+  }
+
+  const keyFailure = apiKeyFailure(keyDraft)
+  const keyValue = keyDraft.trim()
+
+  const ready = displayName.trim().length > 0
+    && baseURL.trim().length > 0
+    && modelName.trim().length > 0
+    && (keyFailure === undefined || keyFailure === 'keyBlank')
+
   const createOnce = async (): Promise<string | undefined> => {
+    const route = deriveUniqueRoute(displayName)
     const keyRef = deriveKeyRef(route)
     const storesKey = keyValue.length > 0
+    const defaultProtocol = protocols.includes('openai-completions')
+      ? 'openai-completions'
+      : (protocols[0] ?? 'openai-completions')
+
+    const rawModels = modelName.split(/[,;\n]+/).map(m => m.trim()).filter(Boolean)
+    const modelEntries = rawModels.length > 0
+      ? rawModels.map(m => ({ id: m, name: m }))
+      : [{ id: modelName.trim(), name: modelName.trim() }]
+
     if (!committed) {
       const profile = {
-        ...displayName.length === 0 ? {} : { displayName },
-        // The profile names the conventional reference only when this card is
-        // about to store a key, matching the editor: a route declared with the
-        // key left blank keeps its provider-native auth path (a credential
-        // chain, ADC) instead of resolving a reference nothing ever sets.
+        displayName: displayName.trim(),
         ...storesKey ? { apiKeyEnv: keyRef } : {},
-        api: protocol,
-        baseURL,
-        models: models.map(model => ({ ...model })),
+        api: defaultProtocol,
+        baseURL: baseURL.trim(),
+        models: modelEntries,
       }
       const response = await api.settings.mutate({
         ns: NS,
         ops: [{ op: 'set', path: ['providers', route], value: profile }],
-        // `taken` is a snapshot too, so the id check alone cannot see a route
-        // declared after this card opened; the revision makes that race a
-        // `settings-conflict` instead of a write over the other profile.
         expectedRevision: openedAt,
       })
       if (!response.result.ok) return response.result.error.message
-      // The provider now exists. A retry after the key write below fails must
-      // not re-run this mutate: the revision it holds is the one this write
-      // just superseded, so the Host would answer `settings-conflict` and the
-      // key could never be stored from this card at all.
       setCommitted(true)
     }
     if (storesKey) {
       const stored = await api.credentials.set({ ref: keyRef, value: keyValue })
-      // The profile landed; saying the key did not is the only honest report,
-      // and the retry above now goes straight back to this write.
       if (!stored.result.ok) return stored.result.error.message
     }
     return undefined
@@ -179,42 +133,9 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       }
       props.onClose(true)
     } catch (error) {
-      // A transport failure rejects rather than answering; without this the
-      // card would stay busy with nothing shown.
       setFailure(messageOf(error))
     } finally {
       setBusy(false)
-    }
-  }
-
-  const [routeTouched, setRouteTouched] = useState(false)
-  const [port, setPort] = useState('')
-
-  const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-
-  const handleDisplayNameChange = (val: string) => {
-    setDisplayName(val)
-    if (!routeTouched) {
-      const slug = slugify(val)
-      if (slug.length > 0) setRoute(slug)
-    }
-  }
-
-  const handlePortChange = (val: string) => {
-    setPort(val)
-    const trimmed = val.trim()
-    if (/^\d+$/.test(trimmed)) {
-      setBaseURL(`http://127.0.0.1:${trimmed}/v1`)
-    }
-  }
-
-  const handleBaseURLChange = (val: string) => {
-    setBaseURL(val)
-    try {
-      const parsed = new URL(val)
-      if (parsed.port) setPort(parsed.port)
-    } catch {
-      // not a valid url yet
     }
   }
 
@@ -230,110 +151,60 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={displayName}
-          placeholder="My Custom Provider"
+          placeholder="e.g. Ollama, LM Studio, Custom Server"
           aria-label={t('customDisplayName')}
           disabled={profileDisabled}
-          onChange={(event) => { handleDisplayNameChange(event.target.value) }}
+          onChange={(event) => { setDisplayName(event.target.value) }}
         />
       </div>
 
       <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('customRoute')}</span>
+        <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
         <input
           className={styles['input']}
           type="text"
-          value={route}
-          placeholder="custom-provider"
-          aria-label={t('customRoute')}
+          value={baseURL}
+          placeholder="e.g. http://127.0.0.1:11434/v1 or https://api.openai.com/v1"
+          aria-label={t('baseUrl')}
           disabled={profileDisabled}
-          onChange={(event) => {
-            setRouteTouched(true)
-            setRoute(event.target.value)
-          }}
+          onChange={(event) => { setBaseURL(event.target.value) }}
         />
       </div>
-      {/* A rejected id reads as a fault, not as guidance — the same split the
-          key field below already makes between its failure and its hint. */}
-      {routeInvalid || routeTaken
-        ? <p className={styles['error']}>{t(routeInvalid ? 'customRouteInvalid' : 'customRouteTaken')}</p>
-        : <p className={styles['advancedHint']}>{t('customRouteHint')}</p>}
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div className={styles['field']} style={{ flex: 1 }}>
-          <span className={styles['fieldLabel']}>{t('baseUrl')}</span>
-          <input
-            className={styles['input']}
-            type="text"
-            value={baseURL}
-            placeholder="http://127.0.0.1:8000/v1"
-            aria-label={t('baseUrl')}
-            disabled={profileDisabled}
-            onChange={(event) => { handleBaseURLChange(event.target.value) }}
-          />
-        </div>
-        <div className={styles['field']} style={{ width: 140 }}>
-          <span className={styles['fieldLabel']}>{t('port')}</span>
-          <input
-            className={styles['input']}
-            type="text"
-            value={port}
-            placeholder="8000"
-            aria-label={t('port')}
-            disabled={profileDisabled}
-            onChange={(event) => { handlePortChange(event.target.value) }}
-          />
-        </div>
-      </div>
       <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('customApi')}</span>
-        <select
-          className={`${styles['input']} ${styles['selectInput']}`}
-          value={protocol}
-          aria-label={t('customApi')}
+        <span className={styles['fieldLabel']}>{t('model')}</span>
+        <input
+          className={styles['input']}
+          type="text"
+          value={modelName}
+          placeholder="e.g. llama3.3, qwen2.5-coder, gpt-4o, mistral"
+          aria-label={t('model')}
           disabled={profileDisabled}
-          onChange={(event) => { setProtocol(event.target.value) }}
-        >
-          {protocols.map(choice => <option key={choice} value={choice}>{choice}</option>)}
-        </select>
+          onChange={(event) => { setModelName(event.target.value) }}
+        />
       </div>
+
       <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('keyInput')} (Optional for local servers)</span>
+        <span className={styles['fieldLabel']}>
+          {t('keyInput')} <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional - leave blank if not needed)</span>
+        </span>
         <input
           className={styles['input']}
           type="password"
           autoComplete="off"
           value={keyDraft}
-          placeholder="Leave blank if not required, or enter API key"
+          placeholder="Enter API key or leave blank for local models"
           aria-label={t('keyInput')}
           disabled={disabled}
           onChange={(event) => { setKeyDraft(event.target.value) }}
         />
-        {/* A create card has no stored key to keep, so the blank case says
-            what a blank field means here instead: this route may authenticate
-            through the provider's own ambient discovery or OAuth. */}
-        {keyFailure === undefined
-          ? null
-          : <p className={styles['error']}>{t(keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure)}</p>}
+        {keyFailure !== undefined && keyFailure !== 'keyBlank'
+          ? <p className={styles['error']}>{t(keyFailure)}</p>
+          : null}
       </div>
 
-      <ModelListEditor
-        models={models}
-        onChange={setModels}
-        probe={{
-          settingsNs: NS,
-          baseURL,
-          api: protocol,
-          ...keyValue.length === 0 ? {} : { apiKey: keyValue },
-        }}
-        probeBlocked={keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure}
-        api={api}
-        t={t}
-        disabled={profileDisabled}
-      />
       {failure !== undefined ? <p className={styles['error']}>{failure}</p> : null}
-      {/* Only the gates with something to say render; the route-id gate has its
-          own field-level hint, so its blocked state would print an empty line. */}
-      {hint === undefined ? null : <p className={styles['advancedHint']}>{hint}</p>}
+
       <EditorFooter
         t={t}
         busy={busy}
