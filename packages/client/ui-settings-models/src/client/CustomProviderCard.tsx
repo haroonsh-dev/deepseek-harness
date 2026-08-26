@@ -58,8 +58,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
   const [committed, setCommitted] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyStatus, setVerifyStatus] = useState<{ ok: boolean; message: string } | null>(null)
 
-  const disabled = props.readOnly || busy
+  const disabled = props.readOnly || busy || verifying
   const profileDisabled = disabled || committed
 
   const slugify = (text: string): string => {
@@ -85,6 +87,76 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const ready = baseURL.trim().length > 0
     && modelName.trim().length > 0
     && (keyFailure === undefined || keyFailure === 'keyBlank')
+
+  const verifyAuth = async (): Promise<void> => {
+    if (!baseURL.trim()) {
+      setVerifyStatus({ ok: false, message: 'Please enter a Base URL first.' })
+      return
+    }
+    setVerifying(true)
+    setVerifyStatus(null)
+    const startTime = Date.now()
+    try {
+      const defaultProtocol = protocols.includes('openai-completions')
+        ? 'openai-completions'
+        : (protocols[0] ?? 'openai-completions')
+
+      const response = await api.llm.discoverModels({
+        settingsNs: NS,
+        baseURL: baseURL.trim(),
+        api: defaultProtocol,
+        ...keyValue.length > 0 ? { apiKey: keyValue } : {},
+      })
+
+      const latency = Date.now() - startTime
+      if (!response.result.ok) {
+        setVerifyStatus({
+          ok: false,
+          message: `Authentication failed: ${response.result.error.message}`,
+        })
+        return
+      }
+
+      const foundModels = response.result.value.models
+      const firstModel = foundModels[0]
+      const typedModel = modelName.trim()
+
+      if (foundModels.length > 0 && firstModel !== undefined) {
+        if (!typedModel) {
+          setModelName(firstModel.id)
+          setVerifyStatus({
+            ok: true,
+            message: `Authenticated successfully (${latency}ms)! Discovered ${foundModels.length} models. Auto-selected "${firstModel.id}".`,
+          })
+        } else {
+          const matched = foundModels.some(m => m.id.toLowerCase() === typedModel.toLowerCase())
+          if (matched) {
+            setVerifyStatus({
+              ok: true,
+              message: `Authenticated successfully (${latency}ms)! Model "${typedModel}" verified on provider.`,
+            })
+          } else {
+            setVerifyStatus({
+              ok: true,
+              message: `Authenticated successfully (${latency}ms)! Connected to provider (${foundModels.length} models available: ${foundModels.slice(0, 3).map(m => m.id).join(', ')}...).`,
+            })
+          }
+        }
+      } else {
+        setVerifyStatus({
+          ok: true,
+          message: `Authenticated successfully (${latency}ms)! Connected to ${baseURL.trim()}.`,
+        })
+      }
+    } catch (err) {
+      setVerifyStatus({
+        ok: false,
+        message: `Connection failed: ${messageOf(err)}`,
+      })
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   const createOnce = async (): Promise<string | undefined> => {
     const route = deriveUniqueRoute(effectiveDisplayName)
@@ -200,6 +272,43 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           onChange={(event) => { setModelName(event.target.value) }}
         />
       </div>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <button
+          type="button"
+          disabled={disabled || verifying || !baseURL.trim()}
+          style={{
+            background: 'var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.06))',
+            border: '1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.15))',
+            borderRadius: 8,
+            padding: '6px 14px',
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: verifying || !baseURL.trim() ? 'not-allowed' : 'pointer',
+            color: 'var(--dsw-alias-label-primary, #f8fafc)',
+            transition: 'background 0.15s ease',
+          }}
+          onClick={verifyAuth}
+        >
+          {verifying ? 'Authenticating…' : 'Verify Authentication'}
+        </button>
+      </div>
+
+      {verifyStatus !== null && (
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            fontSize: 12,
+            lineHeight: '18px',
+            background: verifyStatus.ok ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+            border: `1px solid ${verifyStatus.ok ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            color: verifyStatus.ok ? '#4ade80' : '#f87171',
+          }}
+        >
+          {verifyStatus.ok ? '✓ ' : '✕ '} {verifyStatus.message}
+        </div>
+      )}
 
       {failure !== undefined ? <p className={styles['error']}>{failure}</p> : null}
 
