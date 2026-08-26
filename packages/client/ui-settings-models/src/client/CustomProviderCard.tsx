@@ -78,16 +78,16 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     return candidate
   }
 
+  const effectiveDisplayName = displayName.trim() || 'Custom Provider'
   const keyFailure = apiKeyFailure(keyDraft)
   const keyValue = keyDraft.trim()
 
-  const ready = displayName.trim().length > 0
-    && baseURL.trim().length > 0
+  const ready = baseURL.trim().length > 0
     && modelName.trim().length > 0
     && (keyFailure === undefined || keyFailure === 'keyBlank')
 
   const createOnce = async (): Promise<string | undefined> => {
-    const route = deriveUniqueRoute(displayName)
+    const route = deriveUniqueRoute(effectiveDisplayName)
     const keyRef = deriveKeyRef(route)
     const storesKey = keyValue.length > 0
     const defaultProtocol = protocols.includes('openai-completions')
@@ -101,7 +101,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
 
     if (!committed) {
       const profile = {
-        displayName: displayName.trim(),
+        displayName: effectiveDisplayName,
         ...storesKey ? { apiKeyEnv: keyRef } : {},
         api: defaultProtocol,
         baseURL: baseURL.trim(),
@@ -151,7 +151,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={displayName}
-          placeholder="e.g. Ollama, LM Studio, Custom Server"
+          placeholder="Custom Provider"
           aria-label={t('customDisplayName')}
           disabled={profileDisabled}
           onChange={(event) => { setDisplayName(event.target.value) }}
@@ -164,11 +164,28 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={baseURL}
-          placeholder="e.g. http://127.0.0.1:11434/v1 or https://api.openai.com/v1"
+          placeholder="https://api.openai.com/v1"
           aria-label={t('baseUrl')}
           disabled={profileDisabled}
           onChange={(event) => { setBaseURL(event.target.value) }}
         />
+      </div>
+
+      <div className={styles['field']}>
+        <span className={styles['fieldLabel']}>{t('keyInput')}</span>
+        <input
+          className={styles['input']}
+          type="password"
+          autoComplete="off"
+          value={keyDraft}
+          placeholder="sk-..."
+          aria-label={t('keyInput')}
+          disabled={disabled}
+          onChange={(event) => { setKeyDraft(event.target.value) }}
+        />
+        {keyFailure !== undefined && keyFailure !== 'keyBlank'
+          ? <p className={styles['error']}>{t(keyFailure)}</p>
+          : null}
       </div>
 
       <div className={styles['field']}>
@@ -177,30 +194,11 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={modelName}
-          placeholder="e.g. llama3.3, qwen2.5-coder, gpt-4o, mistral"
+          placeholder="gpt-4o"
           aria-label={t('model')}
           disabled={profileDisabled}
           onChange={(event) => { setModelName(event.target.value) }}
         />
-      </div>
-
-      <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>
-          {t('keyInput')} <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional - leave blank if not needed)</span>
-        </span>
-        <input
-          className={styles['input']}
-          type="password"
-          autoComplete="off"
-          value={keyDraft}
-          placeholder="Enter API key or leave blank for local models"
-          aria-label={t('keyInput')}
-          disabled={disabled}
-          onChange={(event) => { setKeyDraft(event.target.value) }}
-        />
-        {keyFailure !== undefined && keyFailure !== 'keyBlank'
-          ? <p className={styles['error']}>{t(keyFailure)}</p>
-          : null}
       </div>
 
       {failure !== undefined ? <p className={styles['error']}>{failure}</p> : null}
